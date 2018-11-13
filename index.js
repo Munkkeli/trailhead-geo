@@ -59,8 +59,8 @@ app.get('*', (req, res) => {
   return res.sendStatus(404);
 });
 
-app.listen(process.env.API_PORT, () => {
-  log(`Server running on ${process.env.API_PORT}...`);
+app.listen(process.env.PORT, () => {
+  log(`Server running on ${process.env.PORT}...`);
 });
 
 const capture = (content, hash) =>
