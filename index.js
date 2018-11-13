@@ -9,29 +9,10 @@ require('dotenv').config();
 
 const pageLoadTimeout = 10000;
 
-const chrome = {
-  browser: null,
-};
-
 const html = fs
   .readFileSync(__dirname + '/map.html')
   .toString()
   .replace('/*key*/', process.env.MAP_STYLE_URL);
-
-(async () => {
-  if (!fs.existsSync('out')) {
-    fs.mkdirSync('out');
-  }
-
-  const opts = {
-    headless: false,
-    args: ['--headless', '--hide-scrollbars', '--no-sandbox'],
-  };
-
-  chrome.browser = await puppeteer.launch(opts);
-
-  log('Loaded browser "Chrome"');
-})();
 
 app.get('/:lat/:lgn/:zoom', (req, res) => {
   const hash = uuid();
@@ -66,7 +47,15 @@ app.listen(process.env.PORT, () => {
 const capture = (content, hash) =>
   new Promise(async (resolve, reject) => {
     try {
-      const page = await chrome.browser.newPage();
+      const opts = {
+        headless: false,
+        args: ['--headless', '--hide-scrollbars', '--no-sandbox'],
+      };
+
+      const browser = await puppeteer.launch(opts);
+      log('Loaded browser "Chrome"');
+
+      const page = await browser.newPage();
 
       log('Loading content');
       await page.goto(`data:text/html,${content}`, {
@@ -79,6 +68,8 @@ const capture = (content, hash) =>
 
       await page.emulateMedia('screen');
 
+      if (!fs.existsSync('out')) fs.mkdirSync('out');
+
       const path = `./out/${hash}.png`;
       log('Capturing image screenshot to "%s"', path);
       await page.screenshot({
@@ -89,17 +80,11 @@ const capture = (content, hash) =>
       log('Closing page process');
       await page.close();
 
+      log('Closing browser process');
+      await browser.close();
+
       return resolve();
     } catch (e) {
       return reject(e);
     }
   });
-
-process.on('SIGINT', async () => {
-  process.stdin.resume();
-
-  log('Closing browser process');
-  await browser.close();
-
-  process.exit(0);
-});
