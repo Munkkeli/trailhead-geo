@@ -14,21 +14,33 @@ const html = fs
   .toString()
   .replace('/*key*/', process.env.MAP_STYLE_URL);
 
+app.use((req, res, next) => {
+  if (req.headers && req.headers.authorization) {
+    const parts = req.headers.authorization.split(' ');
+    if (
+      parts.length === 2 &&
+      parts[0] === 'Bearer' &&
+      process.env.ACCESS_TOKEN === parts[1]
+    ) {
+      return next();
+    }
+  }
+
+  return res.sendStatus(403);
+});
+
 app.get('/:lat/:lgn/:zoom', (req, res) => {
   const hash = uuid();
-
   const page = html
     .replace('/*lat*/', req.params.lat)
     .replace('/*lgn*/', req.params.lgn)
     .replace('/*zoom*/', req.params.zoom);
 
-  capture(page, hash)
-    .then(() => {
-      const path = __dirname + `/out/${hash}.png`;
-      const image = fs.readFileSync(path);
-      fs.unlinkSync(path);
+  capture(page)
+    .then(buffer => {
       res.contentType('image/png');
-      return res.end(image, 'binary');
+      res.attachment(`${hash}.png`);
+      return res.end(buffer, 'binary');
     })
     .catch(e => {
       console.error(e);
@@ -44,7 +56,7 @@ app.listen(process.env.PORT, () => {
   log(`Server running on ${process.env.PORT}...`);
 });
 
-const capture = (content, hash) =>
+const capture = content =>
   new Promise(async (resolve, reject) => {
     try {
       const opts = {
@@ -68,12 +80,8 @@ const capture = (content, hash) =>
 
       await page.emulateMedia('screen');
 
-      if (!fs.existsSync('out')) fs.mkdirSync('out');
-
-      const path = `./out/${hash}.png`;
-      log('Capturing image screenshot to "%s"', path);
-      await page.screenshot({
-        path,
+      log('Capturing image screenshot');
+      const buffer = await page.screenshot({
         clip: { x: 0, y: 0, width: 300, height: 64 },
       });
 
@@ -83,7 +91,7 @@ const capture = (content, hash) =>
       log('Closing browser process');
       await browser.close();
 
-      return resolve();
+      return resolve(buffer);
     } catch (e) {
       return reject(e);
     }
