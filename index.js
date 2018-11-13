@@ -55,12 +55,16 @@ app.get('/:lat/:lgn/:zoom', (req, res) => {
     });
 });
 
+app.get('*', (req, res) => {
+  return res.sendStatus(404);
+});
+
 app.listen(process.env.API_PORT, () => {
   log(`Server running on ${process.env.API_PORT}...`);
 });
 
 const capture = (content, hash) =>
-  new Promise((resolve, reject) => {
+  new Promise(async (resolve, reject) => {
     try {
       const page = await chrome.browser.newPage();
 
